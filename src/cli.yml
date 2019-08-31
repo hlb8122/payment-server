@@ -1,0 +1,54 @@
+name: Cash:web Keyserver - Rust implementation
+version: "0.1.0"
+author: Harry Barber <hlbarber93@gmail.com>
+about: Cash:web Keyserver is a BCH-based key and metadata server
+args:
+    - config:
+        short: c
+        long: config
+        help: Configuration file
+        takes_value: true
+    - bind-public:
+        long: bind-public
+        help: Bind public address for bip70-server
+        takes_value: true
+    - bind-private:
+        long: bind-private
+        help: Bind private address for bip70-server
+        takes_value: true
+    - node-ip:
+        long: node-ip
+        help: Bitcoin IP address
+        takes_value: true
+    - rpc-port:
+        long: rpc-port
+        help: Bitcoin RPC port
+        takes_value: true
+    - rpc-username:
+        long: rpc-username
+        help: Bitcoin RPC username
+        takes_value: true
+    - rpc-password:
+        long: rpc-password
+        help: Bitcoin RPC password
+        takes_value: true
+    - payment-url:
+        long: ext-url
+        help: Payment URL
+        take_value: true
+    - zmq-port:
+        long: zmq-port
+        help: Bitcoin ZMQ port
+        takes_value: true
+    - db-url:
+        long: db-url
+        help: Database url
+        takes_value: true
+    - db-table:
+        long: db-table
+        help: Database table name
+        takes_value: true
+    - secret:
+        long: s
+        help: Set the signing secret
+        takes_value: true

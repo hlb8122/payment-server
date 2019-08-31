@@ -1,0 +1,19 @@
+syntax = "proto3";
+package models;
+import "proto/paymentrequest.proto";
+
+// Message sent from service to BIP 70 server
+message InvoiceParams {
+    uint64 amount = 2;
+    uint64 expiry_time = 3;
+    string callback_url = 4;
+    string token = 5;
+    repeated bytes tx_data = 6;
+    bytes merchant_data = 7;
+}
+
+// Message sent to service on successful payment
+message CallbackPayload {
+    uint64 payment_id = 1;
+    PaymentACK payment_ack = 2;
+}
