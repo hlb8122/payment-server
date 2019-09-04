@@ -8,38 +8,7 @@ use prost::DecodeError;
 use crate::crypto::errors::CryptoError;
 
 #[derive(Debug)]
-pub enum ValidationError {
-    KeyType,
-    Preimage,
-    EmptyPayload,
-    Outdated,
-    ExpiredTTL,
-    Crypto(CryptoError),
-}
-
-impl fmt::Display for ValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let printable = match self {
-            ValidationError::KeyType => "bad key type",
-            ValidationError::Preimage => "digest mismatch",
-            ValidationError::EmptyPayload => "empty payload",
-            ValidationError::Outdated => "metadata is outdated",
-            ValidationError::ExpiredTTL => "expired TTL",
-            ValidationError::Crypto(err) => return err.fmt(f),
-        };
-        write!(f, "{}", printable)
-    }
-}
-
-impl Into<ValidationError> for CryptoError {
-    fn into(self) -> ValidationError {
-        ValidationError::Crypto(self)
-    }
-}
-
-#[derive(Debug)]
 pub enum ServerError {
-    Validation(ValidationError),
     Crypto(CryptoError),
     NotFound,
     InvoiceParamsDecode,
@@ -56,7 +25,6 @@ impl fmt::Display for ServerError {
             ServerError::InvoiceParamsDecode => "invoice parameter decoding error",
             ServerError::UnsupportedSigScheme => "signature scheme not supported",
             ServerError::Payment(err) => return err.fmt(f),
-            ServerError::Validation(err) => return err.fmt(f),
             ServerError::Address(err) => return err.fmt(f),
         };
         write!(f, "{}", printable)
@@ -81,12 +49,6 @@ impl From<DecodeError> for ServerError {
     }
 }
 
-impl From<ValidationError> for ServerError {
-    fn from(err: ValidationError) -> ServerError {
-        ServerError::Validation(err)
-    }
-}
-
 impl error::ResponseError for CryptoError {
     fn error_response(&self) -> HttpResponse {
         match self {
@@ -98,24 +60,9 @@ impl error::ResponseError for CryptoError {
     }
 }
 
-impl error::ResponseError for ValidationError {
-    fn error_response(&self) -> HttpResponse {
-        match self {
-            ValidationError::Crypto(err_inner) => return err_inner.error_response(),
-            ValidationError::EmptyPayload => HttpResponse::BadRequest(),
-            ValidationError::KeyType => HttpResponse::BadRequest(),
-            ValidationError::Preimage => HttpResponse::BadRequest(),
-            ValidationError::Outdated => HttpResponse::BadRequest(),
-            ValidationError::ExpiredTTL => HttpResponse::BadRequest(),
-        }
-        .body(self.to_string())
-    }
-}
-
 impl error::ResponseError for ServerError {
     fn error_response(&self) -> HttpResponse {
         match self {
-            ServerError::Validation(err) => err.error_response(),
             // Do not yield sensitive information to clients
             ServerError::NotFound => HttpResponse::NotFound().body(self.to_string()),
             ServerError::InvoiceParamsDecode => HttpResponse::BadRequest().body(self.to_string()),

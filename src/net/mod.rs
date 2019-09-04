@@ -7,9 +7,7 @@ use std::{
 };
 
 use actix_web::{
-    http::{
-        header::{HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, LOCATION, PRAGMA},
-    },
+    http::header::{HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, LOCATION, PRAGMA},
     web, HttpRequest, HttpResponse,
 };
 use bitcoin::{util::psbt::serialize::Deserialize, Transaction};
@@ -36,6 +34,7 @@ pub const VALID_DURATION: u64 = 30;
 // Payment handler
 pub fn payment_handler(
     req: HttpRequest,
+    payment_id: web::Path<i64>,
     payload: web::Payload,
     data: web::Data<(BitcoinClient, WalletState)>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = ServerError>> {
@@ -169,25 +168,27 @@ pub fn generate_invoice(
     let response = invoice_params_fut
         .join(new_addr)
         .and_then(move |(invoice_params, addr_raw)| {
+            // TODO: Don't unwrap here
+            let mut payment_details = invoice_params.details.unwrap();
+
+            // Complete details
+            payment_details.network = Some(SETTINGS.network.to_string());
+            // TODO: Check time is some
+            // TODO: Check expiry is some
+            payment_details.payment_url = Some(SETTINGS.payment_url.to_string());
+
             // Generate outputs
             let outputs = generate_outputs(addr_raw, invoice_params.tx_data);
-
-            // Collect payment details
-            let payment_details = PaymentDetails {
-                network: Some(SETTINGS.network.to_string()),
-                time: current_time.duration_since(UNIX_EPOCH).unwrap().as_secs(),
-                expires: Some(expiry_time.duration_since(UNIX_EPOCH).unwrap().as_secs()),
-                memo: None,
-                merchant_data: Some(invoice_params.merchant_data),
-                outputs,
-                payment_url: Some(SETTINGS.payment_url.to_string()),
-            };
+            payment_details.outputs = outputs;
             let mut serialized_payment_details = Vec::with_capacity(payment_details.encoded_len());
             payment_details
                 .encode(&mut serialized_payment_details)
                 .unwrap();
 
+            // Add row to SQL table
+
             // Generate payment invoice
+            // TODO: Sign here
             let pki_type = Some("none".to_string());
             let payment_invoice = PaymentRequest {
                 pki_type,
@@ -207,15 +208,4 @@ pub fn generate_invoice(
 
     // Respond
     Box::new(response)
-}
-
-/*
-Payment middleware
-*/
-pub struct CheckPayment(BitcoinClient, WalletState);
-
-impl CheckPayment {
-    pub fn new(client: BitcoinClient, wallet_state: WalletState) -> Self {
-        CheckPayment(client, wallet_state)
-    }
 }

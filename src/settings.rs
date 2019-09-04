@@ -15,9 +15,18 @@ pub struct Settings {
     pub rpc_password: String,
     pub zmq_port: u16,
     pub secret: String,
-    pub db_url: String,
-    pub table_name: String,
+    pub sql: Sql,
     pub network: Network,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Sql {
+    pub prefix: String,
+    pub host: String,
+    pub port: u16,
+    pub username: String,
+    pub password: String,
+    pub db: String,
 }
 
 impl Settings {
@@ -41,9 +50,13 @@ impl Settings {
         s.set_default("rpc_password", "password").unwrap();
         s.set_default("zmq_port", "28332").unwrap();
         s.set_default("secret", "secret").unwrap();
-        s.set_default("db_url", "mysql://localhost:3306/payments")
-            .unwrap();
-        s.set_default("db_table", "payments").unwrap();
+        s.set_default("sql.prefix", "postgresql").unwrap();
+        s.set_default("sql.host", "127.0.0.1").unwrap();
+        s.set_default("sql.username", "postgres").unwrap();
+        s.set_default("sql.password", "password").unwrap();
+        s.set_default("sql.port", "5432").unwrap();
+        s.set_default("sql.db", "postgres").unwrap();
+        s.set_default("network", "regnet").unwrap();
 
         // Load config from file
         let mut default_config = home_dir.clone();
@@ -97,15 +110,7 @@ impl Settings {
             s.set("secret", secret)?;
         }
 
-        // Set db URL from cmd line
-        if let Some(db_url) = matches.value_of("db-url") {
-            s.set("db_url", db_url)?;
-        }
-
-        // Set db table from cmd line
-        if let Some(db_table) = matches.value_of("db-table") {
-            s.set("db_table", db_table)?;
-        }
+        // TODO: Database from commandline
 
         s.try_into()
     }

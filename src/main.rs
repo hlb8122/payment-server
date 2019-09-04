@@ -1,23 +1,29 @@
 #[macro_use]
 extern crate clap;
+#[macro_use]
+extern crate diesel;
+#[macro_use]
+extern crate serde_derive;
 
 pub mod bitcoin;
 pub mod crypto;
 pub mod net;
 pub mod settings;
+pub mod sql;
 
 use std::io;
 
-use actix_web::{middleware::Logger, web, App, HttpServer};
+use actix_http::HttpService;
+use actix_web::{dev::Server, middleware::Logger, web, App};
+use diesel::{
+    prelude::*,
+    r2d2::{self, ConnectionManager},
+};
 use env_logger::Env;
 use lazy_static::lazy_static;
 use log::info;
 
-use crate::{
-    bitcoin::{BitcoinClient, WalletState},
-    net::*,
-    settings::Settings,
-};
+use crate::{bitcoin::BitcoinClient, net::*, settings::Settings};
 
 pub mod models {
     include!(concat!(env!("OUT_DIR"), "/models.rs"));
@@ -36,9 +42,6 @@ fn main() -> io::Result<()> {
     info!("starting public endpoint @: {}", SETTINGS.bind_public);
     info!("starting private endpoint @: {}", SETTINGS.bind_private);
 
-    // Init wallet
-    let wallet_state = WalletState::default();
-
     // Init Bitcoin client
     let bitcoin_client = BitcoinClient::new(
         format!("http://{}:{}", SETTINGS.node_ip.clone(), SETTINGS.rpc_port),
@@ -46,42 +49,63 @@ fn main() -> io::Result<()> {
         SETTINGS.rpc_password.clone(),
     );
 
+    // Init SQL connection
+    let url = format!(
+        "{}://{}:{}@{}:{}/{}",
+        SETTINGS.sql.prefix,
+        SETTINGS.sql.username,
+        SETTINGS.sql.password,
+        SETTINGS.sql.host,
+        SETTINGS.sql.port,
+        SETTINGS.sql.db
+    );
+    let manager = ConnectionManager::<PgConnection>::new(url);
+    let pool = r2d2::Pool::builder()
+        .build(manager)
+        .expect("failed to create pool");
+
     // Init ZMQ
+    // TODO: Check confirmations
     // let (tx_stream, connection) =
     //     tx_stream::get_tx_stream(&format!("tcp://{}:{}", SETTINGS.node_ip, SETTINGS.zmq_port));
     // let key_stream = tx_stream::extract_details(tx_stream);
     // actix_rt::Arbiter::current().send(connection.map_err(|e| error!("{:?}", e)));
 
     let bitcoin_client_inner = bitcoin_client.clone();
-    let wallet_state_inner = wallet_state.clone();
-    let public_endpoint = HttpServer::new(move || {
-        // Init app
-        App::new()
-            .wrap(Logger::default())
-            .wrap(Logger::new("%a %{User-Agent}i"))
-            .service(
-                // Payment endpoint
-                web::resource("/payments")
-                    .data((
-                        bitcoin_client_inner.to_owned(),
-                        wallet_state_inner.to_owned(),
-                    ))
-                    .route(web::post().to_async(payment_handler)),
-            )
-    });
+    let pool_inner = pool.clone();
 
-    let private_endpoint = HttpServer::new(move || {
-        // Init app
-        App::new()
-            .wrap(Logger::default())
-            .wrap(Logger::new("%a %{User-Agent}i"))
-            .service(
-                // Payment endpoint
-                web::resource("/invoice")
-                    .data((bitcoin_client.to_owned(), wallet_state.to_owned()))
-                    .route(web::post().to_async(generate_invoice)),
+    Server::build()
+        .bind("public", &SETTINGS.bind_public, move || {
+            HttpService::build().finish(
+                // Init app
+                App::new()
+                    .wrap(Logger::default())
+                    .wrap(Logger::new("%a %{User-Agent}i"))
+                    .service(
+                        // Payment route
+                        web::resource("/payment/{payment_id}")
+                            .data((bitcoin_client_inner.to_owned(), pool_inner.to_owned()))
+                            .route(web::post().to_async(payment_handler)),
+                    ),
             )
-    });
+        })
+        .unwrap()
+        .bind("private", &SETTINGS.bind_private, move || {
+            HttpService::build().finish(
+                // Init app
+                App::new()
+                    .wrap(Logger::default())
+                    .wrap(Logger::new("%a %{User-Agent}i"))
+                    .service(
+                        // Create invoice route
+                        web::resource("/invoice")
+                            .data((bitcoin_client.to_owned(), pool.to_owned()))
+                            .route(web::post().to_async(generate_invoice)),
+                    ),
+            )
+        })
+        .unwrap()
+        .run();
 
     sys.run()
 }

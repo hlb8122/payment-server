@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 actix-web = "*"
+actix-http = "*"
 actix-service = "*"
 actix-rt = "*"
 base64 = "*"
@@ -15,7 +16,9 @@ bitcoincash-addr = "*"
 bitcoin_hashes = "*"
 bytes = "*"
 clap = { version = "*", features = ["yaml"] }
+chrono = { version = "0.4.7", features = [ "serde" ] }
 config = "*"
+diesel = { version = "*", features = [ "postgres",  "r2d2", "chrono"] }
 dirs = "*"
 env_logger = "*"
 futures = "*"
