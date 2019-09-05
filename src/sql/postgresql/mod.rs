@@ -1,7 +1,7 @@
 pub mod models;
 pub mod schema;
 
-use chrono::{NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use diesel::{
     pg::PgConnection,
     prelude::*,
@@ -10,46 +10,45 @@ use diesel::{
 };
 use uuid::Uuid;
 
-use crate::{models::*, sql::postgresql::models::NewPayment, ConnPool};
+use crate::{models::*, sql::postgresql::models::NewPayment};
 
 pub fn add_payment(
-    invoice_params: &InvoiceParams,
-    str_addr: &str,
+    payment_details: &PaymentDetails,
+    id: &Uuid,
+    address: &str,
+    amount: i64,
+    callback_url: Option<&str>,
+    token: Option<&[u8]>,
     conn: &PooledConnection<ConnectionManager<PgConnection>>,
 ) -> Result<Uuid, Error> {
-    use schema::{payments::dsl::*, PaymentStateEnum};
-
-    let dt_issue_time = NaiveDateTime::from_timestamp(invoice_params.time as i64, 0);
-    let dt_expiry_time = match invoice_params.expiry {
-        0 => None,
-        value => Some(NaiveDateTime::from_timestamp(value as i64, 0)),
+    use schema::{
+        payments::dsl::{id as dsl_id, payments},
+        PaymentStateEnum,
     };
 
-    let opt_callback_url = match invoice_params.callback_url.as_str() {
-        "" => None,
-        value => Some(value),
-    };
-
-    let opt_merchant_data = if invoice_params.merchant_data.is_empty() {
-        None
-    } else {
-        Some(&invoice_params.merchant_data[..])
-    };
+    let issue_time = &NaiveDateTime::from_timestamp(payment_details.time as i64, 0);
+    let expiry_time = payment_details
+        .expires
+        .map(|value| NaiveDateTime::from_timestamp(value as i64, 0));
+    let merchant_data = payment_details
+        .merchant_data
+        .as_ref()
+        .map(|value| &value[..]);
 
     // Construct row
     let new_payment = NewPayment {
-        id: &Uuid::new_v4(),
-        issue_time: &dt_issue_time,
-        amount: &(invoice_params.amount as i32),
-        address: &str_addr,
-        expiry_time: dt_expiry_time.as_ref(),
-        merchant_data: opt_merchant_data,
+        id,
+        issue_time,
+        amount: &amount,
+        address,
+        expiry_time: expiry_time.as_ref(),
+        merchant_data,
         state: &PaymentStateEnum::Pending,
-        token: Some(&invoice_params.token),
-        callback_url: opt_callback_url,
+        token,
+        callback_url,
     };
     diesel::insert_into(payments)
         .values(&new_payment)
-        .returning(id)
+        .returning(dsl_id)
         .get_result(conn)
 }

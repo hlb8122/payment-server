@@ -17,6 +17,7 @@ pub enum PaymentStateEnum {
     Received,
     Confirmed,
     Rejected,
+    Expired,
 }
 
 impl ToSql<PaymentStateType, Pg> for PaymentStateEnum {
@@ -26,6 +27,7 @@ impl ToSql<PaymentStateType, Pg> for PaymentStateEnum {
             Self::Received => out.write_all(b"received")?,
             Self::Confirmed => out.write_all(b"confirmed")?,
             Self::Rejected => out.write_all(b"rejected")?,
+            Self::Expired => out.write_all(b"expired")?,
         }
         Ok(IsNull::No)
     }
@@ -38,6 +40,7 @@ impl FromSql<PaymentStateType, Pg> for PaymentStateEnum {
             b"received" => Ok(Self::Received),
             b"confirmed" => Ok(Self::Confirmed),
             b"rejected" => Ok(Self::Rejected),
+            b"expired" => Ok(Self::Expired),
             _ => Err("Unrecognized enum variant".into()),
         }
     }
@@ -49,13 +52,16 @@ table! {
     payments (id) {
         id -> Uuid, // Payment ID
         issue_time -> Timestamp, // The time of issuance
-        amount -> Integer, // The amount to be paid
+        amount -> BigInt, // The amount to be paid
         address -> Text, // Address to be paid to
         expiry_time -> Nullable<Timestamp>, // Expiry time of the payment
+        memo_ack -> Nullable<Text>, // Memo to be included in the
         merchant_data -> Nullable<Blob>, // Merchant data
+        token -> Nullable<Blob>, // Token to be signed then attached to payment ack response
         state -> PaymentStateType, // Payment state
         payment_time -> Nullable<Timestamp>, // Time payment was completed
-        token -> Nullable<Blob>, // Token to be signed then attached to payment ack response
+        tx_id -> Nullable<Text>, // Transaction ID of the payment
+        refund_to -> Nullable<Text>, // Refund address
         callback_url -> Nullable<Text>, // Callback URL
     }
 }

@@ -1,10 +1,7 @@
 pub mod errors;
 pub mod jsonrpc_client;
 
-use std::{
-    str,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::str;
 
 use actix_web::{
     http::header::{HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, LOCATION, PRAGMA},
@@ -20,6 +17,7 @@ use futures::{
 };
 use prost::Message;
 use url::Url;
+use uuid::Uuid;
 
 use crate::{
     bitcoin::*,
@@ -36,7 +34,7 @@ pub const VALID_DURATION: u64 = 30;
 // Payment handler
 pub fn payment_handler(
     req: HttpRequest,
-    payment_id: web::Path<i64>,
+    payment_id: web::Path<String>,
     payload: web::Payload,
     data: web::Data<(BitcoinClient, ConnPool)>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = ServerError>> {
@@ -77,7 +75,7 @@ pub fn payment_handler(
             };
 
             // Check outputs
-            let wallet_data = &data.1;
+            // let wallet_data = &data.1;
             // if !wallet_data.check_outputs(tx) {
             //     return Either::A(err(PaymentError::InvalidOutputs));
             // }
@@ -149,10 +147,6 @@ pub fn generate_invoice(
         InvoiceParams::decode(metadata_raw).map_err(|_| ServerError::InvoiceParamsDecode)
     });
 
-    // Valid interval
-    let current_time = SystemTime::now();
-    let expiry_time = current_time + Duration::from_secs(VALID_DURATION);
-
     // Get new addr and add to wallet
     let new_addr = client.get_new_addr().then(move |addr_opt| match addr_opt {
         Ok(str_addr) => {
@@ -166,40 +160,65 @@ pub fn generate_invoice(
         Err(_e) => Err(ServerError::Payment(PaymentError::AddrFetchFailed)),
     });
 
-    let insert_row = fut_invoice_params.join(new_addr).and_then(
+    let generate = fut_invoice_params.join(new_addr).and_then(
         move |(invoice_params, (raw_addr, str_addr))| {
+            // Generate outputs
+            let outputs =
+                generate_outputs(&raw_addr, invoice_params.amount, &invoice_params.tx_data);
+
+            // Generate payment details
+            let id = Uuid::new_v4();
+            let expires = match invoice_params.expires {
+                0 => None,
+                some => Some(some),
+            };
+            let callback_url = match invoice_params.callback_url.as_str() {
+                "" => None,
+                value => Some(value),
+            };
+            let merchant_data = if invoice_params.merchant_data.is_empty() {
+                None
+            } else {
+                Some(invoice_params.merchant_data)
+            };
+            let token = if invoice_params.token.is_empty() {
+                None
+            } else {
+                Some(&invoice_params.token[..])
+            };
+            let payment_details = PaymentDetails {
+                network: Some(SETTINGS.network.to_string()),
+                payment_url: Some(format!("{}{}:", SETTINGS.payment_url, id.to_string())),
+                memo: None,
+                expires,
+                time: invoice_params.time,
+                merchant_data,
+                outputs,
+            };
+
             // Add row to SQL table
             let connection = conn.get().unwrap();
-            let fut_add_payment = add_payment(&invoice_params, &str_addr, &connection);
+            let fut_add_payment = add_payment(
+                &payment_details,
+                &id,
+                &str_addr,
+                invoice_params.amount as i64,
+                callback_url,
+                token,
+                &connection,
+            );
+            let mut serialized_payment_details = Vec::with_capacity(payment_details.encoded_len());
+            payment_details
+                .encode(&mut serialized_payment_details)
+                .unwrap();
             actix_web::web::block(|| fut_add_payment)
                 .map_err(|err| match err {
                     actix_threadpool::BlockingError::Error(e) => e.into(),
                     _ => unreachable!(),
                 })
-                .map(|_| (invoice_params, raw_addr))
+                .map(|_| serialized_payment_details)
         },
     );
-
-    let generate = insert_row.and_then(move |(invoice_params, raw_addr)| {
-        // Generate outputs
-        let outputs = generate_outputs(&raw_addr, &invoice_params.tx_data);
-
-        let payment_details = PaymentDetails {
-            network: Some(SETTINGS.network.to_string()),
-            payment_url: Some(SETTINGS.payment_url.to_string()),
-            memo: None,
-            expires: None,
-            time: invoice_params.time,
-            merchant_data: None,
-            outputs,
-        };
-        let mut serialized_payment_details = Vec::with_capacity(payment_details.encoded_len());
-        payment_details
-            .encode(&mut serialized_payment_details)
-            .unwrap();
-
-        Ok(serialized_payment_details)
-    });
 
     let response = generate.and_then(|serialized_payment_details| {
         // Generate payment invoice

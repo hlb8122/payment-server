@@ -7,7 +7,7 @@ use uuid::Uuid;
 pub struct Payment {
     pub id: Uuid,
     pub issue_time: NaiveDateTime,
-    pub amount: i32,
+    pub amount: i64,
     pub address: String,
     pub expiry_time: Option<NaiveDateTime>,
     pub merchant_data: Option<Vec<u8>>,
@@ -22,7 +22,7 @@ pub struct Payment {
 pub struct NewPayment<'a> {
     pub id: &'a Uuid,
     pub issue_time: &'a NaiveDateTime,
-    pub amount: &'a i32,
+    pub amount: &'a i64,
     pub address: &'a str,
     pub expiry_time: Option<&'a NaiveDateTime>,
     pub merchant_data: Option<&'a [u8]>,

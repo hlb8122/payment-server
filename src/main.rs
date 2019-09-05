@@ -17,7 +17,6 @@ use actix_http::HttpService;
 use actix_web::{dev::Server, middleware::Logger, web, App};
 use diesel::{
     pg::PgConnection,
-    prelude::*,
     r2d2::{ConnectionManager, Pool},
 };
 use env_logger::Env;
@@ -108,7 +107,8 @@ fn main() -> io::Result<()> {
             )
         })
         .unwrap()
-        .run();
+        .run()
+        .unwrap();
 
     sys.run()
 }

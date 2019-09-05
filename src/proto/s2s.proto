@@ -9,17 +9,19 @@ message InvoiceParams {
     // Amount
     uint64 amount = 2;
     // Issue time
-    uint64 time = 4;
+    uint64 time = 3;
     // Expiry time
-    uint64 expiry = 5;
-    // Merchant data
+    uint64 expires = 4;
+    string memo = 5;
     bytes merchant_data = 6;
+    // Memo to be sent in PaymentAck
+    string memo_ack = 7;
     // Token to be signed and put in the payment ack headers
-    bytes token = 7;
+    bytes token = 8;
     // Data to be inserted into op_return
-    bytes tx_data = 8;
+    bytes tx_data = 9;
     // Callback URL
-    string callback_url = 9;
+    string callback_url = 10;
 }
 
 // Message sent in response to the InvoiceParams

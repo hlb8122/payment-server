@@ -1,13 +1,7 @@
 mod client;
 // pub mod tx_stream;
 
-pub const PRICE: u64 = 5;
-
-use std::{
-    collections::HashSet,
-    string::ToString,
-    sync::{Arc, RwLock},
-};
+use std::string::ToString;
 
 use bitcoin::{Transaction, TxOut};
 use serde::Deserialize;
@@ -53,37 +47,26 @@ impl ToString for Network {
     }
 }
 
-#[derive(Default, Clone)]
-pub struct WalletState(Arc<RwLock<HashSet<Vec<u8>>>>);
-
-impl WalletState {
-    pub fn check_p2pkh(&self, output: &TxOut) -> bool {
-        // Check first output
-        let value = output.value;
-        if value != PRICE {
-            return false;
-        }
-
-        // Check p2pkh addr
-        let script = &output.script_pubkey[..];
-        if let Some(pubkey_hash) = extract_pubkey_hash(script) {
-            // Check if wallet contains that address
-            if self.0.read().unwrap().contains(&pubkey_hash) {
-                // Flush address
-                self.0.write().unwrap().remove(&pubkey_hash);
-                true
-            } else {
-                false
-            }
-        } else {
-            false
-        }
+pub fn check_p2pkh(output: &TxOut, expected_amount: u64, expected_pk_hash: &[u8]) -> bool {
+    // Check first output
+    if output.value != expected_amount {
+        return false;
     }
 
-    pub fn check_outputs(&self, tx: Transaction) -> bool {
-        // TODO: Enforce op_return outputs
-        tx.output.iter().any(|output| self.check_p2pkh(output))
+    // Check p2pkh addr
+    let script = &output.script_pubkey[..];
+    if let Some(pubkey_hash) = extract_pubkey_hash(script) {
+        expected_pk_hash == &pubkey_hash[..]
+    } else {
+        false
     }
+}
+
+pub fn check_outputs(tx: Transaction, expected_amount: u64, expected_pk_hash: &[u8]) -> bool {
+    // TODO: Enforce op_return outputs
+    tx.output
+        .iter()
+        .any(|output| check_p2pkh(output, expected_amount, expected_pk_hash))
 }
 
 pub fn extract_op_return(script: &[u8]) -> Option<Vec<u8>> {
@@ -122,13 +105,13 @@ fn extract_pubkey_hash(raw_script: &[u8]) -> Option<Vec<u8>> {
     Some(raw_script[3..23].to_vec())
 }
 
-pub fn generate_outputs(pk_hash: &[u8], data: &[u8]) -> Vec<Output> {
+pub fn generate_outputs(pk_hash: &[u8], amount: u64, data: &[u8]) -> Vec<Output> {
     // Generate p2pkh
     let p2pkh_script_pre: [u8; 3] = [118, 169, 20];
     let p2pkh_script_post: [u8; 2] = [136, 172];
     let p2pkh_script = [&p2pkh_script_pre[..], &pk_hash[..], &p2pkh_script_post[..]].concat();
     let p2pkh_output = Output {
-        amount: Some(PRICE),
+        amount: Some(amount),
         script: p2pkh_script,
     };
 
@@ -139,18 +122,4 @@ pub fn generate_outputs(pk_hash: &[u8], data: &[u8]) -> Vec<Output> {
     };
 
     vec![p2pkh_output, op_return]
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_gen_check_output() {
-        let pk_hash = [3; 20].to_vec();
-        let outputs = generate_outputs(pk_hash.clone(), "", pk_hash.clone());
-        assert_eq!(PRICE, outputs.get(0).unwrap().amount.unwrap());
-        let extracted_pkh = extract_pubkey_hash(&outputs.get(0).unwrap().script[..]);
-        assert_eq!(pk_hash, extracted_pkh.unwrap());
-    }
 }
