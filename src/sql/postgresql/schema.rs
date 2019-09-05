@@ -55,10 +55,12 @@ table! {
         amount -> BigInt, // The amount to be paid
         address -> Text, // Address to be paid to
         expiry_time -> Nullable<Timestamp>, // Expiry time of the payment
-        memo_ack -> Nullable<Text>, // Memo to be included in the
+        req_memo -> Nullable<Text>, // Memo to be included in the request
         merchant_data -> Nullable<Blob>, // Merchant data
-        token -> Nullable<Blob>, // Token to be signed then attached to payment ack response
-        state -> PaymentStateType, // Payment state
+        ack_memo -> Nullable<Text>, // Memo to be included in the request
+        token_data -> Nullable<Blob>, // Token to be signed then attached to payment ack response
+        tx_data -> Nullable<Blob>, // Data required inside OP_RETURN
+        payment_state -> PaymentStateType, // Payment state
         payment_time -> Nullable<Timestamp>, // Time payment was completed
         tx_id -> Nullable<Text>, // Transaction ID of the payment
         refund_to -> Nullable<Text>, // Refund address

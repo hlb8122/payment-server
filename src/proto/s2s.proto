@@ -12,10 +12,10 @@ message InvoiceRequest {
     uint64 time = 3;
     // Expiry time
     uint64 expires = 4;
-    string memo = 5;
+    string req_memo = 5;
     bytes merchant_data = 6;
     // Memo to be sent in PaymentAck
-    string memo_ack = 7;
+    string ack_memo = 7;
     // Token to be signed and put in the payment ack headers
     bytes token = 8;
     // Data to be inserted into op_return

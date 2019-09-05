@@ -181,15 +181,14 @@ pub fn generate_invoice(
             } else {
                 Some(invoice_request.merchant_data)
             };
-            let token = if invoice_request.token.is_empty() {
-                None
-            } else {
-                Some(&invoice_request.token[..])
+            let req_memo = match invoice_request.req_memo.as_str() {
+                "" => None,
+                value => Some(value),
             };
             let payment_details = PaymentDetails {
                 network: Some(SETTINGS.network.to_string()),
                 payment_url: Some(format!("{}{}:", SETTINGS.payment_url, &id.to_string())),
-                memo: None,
+                memo: req_memo.map(|value| value.to_string()),
                 expires,
                 time: invoice_request.time,
                 merchant_data,
@@ -197,14 +196,31 @@ pub fn generate_invoice(
             };
 
             // Add row to SQL table
+            let token_data = if invoice_request.token.is_empty() {
+                None
+            } else {
+                Some(&invoice_request.token[..])
+            };
+            let ack_memo = match invoice_request.ack_memo.as_str() {
+                "" => None,
+                value => Some(value),
+            };
+            let tx_data = if invoice_request.tx_data.is_empty() {
+                None
+            } else {
+                Some(&invoice_request.tx_data[..])
+            };
             let connection = conn.get().unwrap();
             let fut_add_payment = add_payment(
                 &payment_details,
                 &id,
                 &str_addr,
                 invoice_request.amount as i64,
+                req_memo,
                 callback_url,
-                token,
+                ack_memo,
+                token_data,
+                tx_data,
                 &connection,
             );
             let mut serialized_payment_details = Vec::with_capacity(payment_details.encoded_len());

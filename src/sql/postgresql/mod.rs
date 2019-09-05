@@ -17,8 +17,11 @@ pub fn add_payment(
     id: &Uuid,
     address: &str,
     amount: i64,
+    req_memo: Option<&str>,
+    ack_memo: Option<&str>,
     callback_url: Option<&str>,
-    token: Option<&[u8]>,
+    token_data: Option<&[u8]>,
+    tx_data: Option<&[u8]>,
     conn: &PooledConnection<ConnectionManager<PgConnection>>,
 ) -> Result<Uuid, Error> {
     use schema::{
@@ -39,12 +42,15 @@ pub fn add_payment(
     let new_payment = NewPayment {
         id,
         issue_time,
-        amount: &amount,
+        amount,
         address,
         expiry_time: expiry_time.as_ref(),
+        req_memo,
         merchant_data,
-        state: &PaymentStateEnum::Pending,
-        token,
+        ack_memo,
+        token_data,
+        tx_data,
+        payment_state: &PaymentStateEnum::Pending,
         callback_url,
     };
     diesel::insert_into(payments)
