@@ -16,8 +16,9 @@ use std::io;
 use actix_http::HttpService;
 use actix_web::{dev::Server, middleware::Logger, web, App};
 use diesel::{
+    pg::PgConnection,
     prelude::*,
-    r2d2::{self, ConnectionManager},
+    r2d2::{ConnectionManager, Pool},
 };
 use env_logger::Env;
 use lazy_static::lazy_static;
@@ -32,6 +33,8 @@ pub mod models {
 lazy_static! {
     pub static ref SETTINGS: Settings = Settings::new().expect("couldn't load config");
 }
+
+pub type ConnPool = Pool<ConnectionManager<PgConnection>>;
 
 fn main() -> io::Result<()> {
     let sys = actix_rt::System::new("bip70-server");
@@ -60,7 +63,7 @@ fn main() -> io::Result<()> {
         SETTINGS.sql.db
     );
     let manager = ConnectionManager::<PgConnection>::new(url);
-    let pool = r2d2::Pool::builder()
+    let pool = Pool::builder()
         .build(manager)
         .expect("failed to create pool");
 

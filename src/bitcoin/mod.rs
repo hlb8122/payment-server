@@ -57,14 +57,6 @@ impl ToString for Network {
 pub struct WalletState(Arc<RwLock<HashSet<Vec<u8>>>>);
 
 impl WalletState {
-    pub fn add(&self, addr: Vec<u8>) {
-        self.0.write().unwrap().insert(addr);
-    }
-
-    pub fn remove(&self, addr: Vec<u8>) {
-        self.0.write().unwrap().remove(&addr);
-    }
-
     pub fn check_p2pkh(&self, output: &TxOut) -> bool {
         // Check first output
         let value = output.value;
@@ -130,7 +122,7 @@ fn extract_pubkey_hash(raw_script: &[u8]) -> Option<Vec<u8>> {
     Some(raw_script[3..23].to_vec())
 }
 
-pub fn generate_outputs(pk_hash: Vec<u8>, data: Vec<Vec<u8>>) -> Vec<Output> {
+pub fn generate_outputs(pk_hash: &[u8], data: &[u8]) -> Vec<Output> {
     // Generate p2pkh
     let p2pkh_script_pre: [u8; 3] = [118, 169, 20];
     let p2pkh_script_post: [u8; 2] = [136, 172];
@@ -140,18 +132,13 @@ pub fn generate_outputs(pk_hash: Vec<u8>, data: Vec<Vec<u8>>) -> Vec<Output> {
         script: p2pkh_script,
     };
 
-    // Generate op return
-    let op_returns: Vec<Output> = data
-        .iter()
-        .map(|item| {
-            let op_return_script = [&[106, 9 + 20 + item.len() as u8][..], &item].concat();
-            Output {
-                amount: Some(0),
-                script: op_return_script,
-            }
-        })
-        .collect();
-    [vec![p2pkh_output], op_returns].concat()
+    let op_return_script = [&[106, 9 + 20 + data.len() as u8][..], &data].concat();
+    let op_return = Output {
+        amount: Some(0),
+        script: op_return_script,
+    };
+
+    vec![p2pkh_output, op_return]
 }
 
 #[cfg(test)]

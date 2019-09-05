@@ -3,6 +3,7 @@ use std::fmt;
 use actix_web::{error, HttpResponse};
 use bitcoin::consensus::encode::Error as TxDeserializeError;
 use bitcoincash_addr::AddressError;
+use diesel::result::Error as DieselError;
 use prost::DecodeError;
 
 use crate::crypto::errors::CryptoError;
@@ -15,6 +16,7 @@ pub enum ServerError {
     UnsupportedSigScheme,
     Payment(PaymentError),
     Address(AddressError),
+    Diesel(DieselError),
 }
 
 impl fmt::Display for ServerError {
@@ -26,6 +28,7 @@ impl fmt::Display for ServerError {
             ServerError::UnsupportedSigScheme => "signature scheme not supported",
             ServerError::Payment(err) => return err.fmt(f),
             ServerError::Address(err) => return err.fmt(f),
+            ServerError::Diesel(err) => return err.fmt(f),
         };
         write!(f, "{}", printable)
     }
@@ -46,6 +49,12 @@ impl From<CryptoError> for ServerError {
 impl From<DecodeError> for ServerError {
     fn from(_: DecodeError) -> Self {
         ServerError::InvoiceParamsDecode
+    }
+}
+
+impl From<DieselError> for ServerError {
+    fn from(err: DieselError) -> Self {
+        ServerError::Diesel(err)
     }
 }
 
@@ -70,6 +79,7 @@ impl error::ResponseError for ServerError {
             ServerError::Crypto(err) => err.error_response(),
             ServerError::Payment(err) => err.error_response(),
             ServerError::Address(err) => HttpResponse::BadRequest().body(err.to_string()),
+            ServerError::Diesel(err) => HttpResponse::BadRequest().body(err.to_string()),
         }
     }
 }

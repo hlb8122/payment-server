@@ -4,14 +4,22 @@ import "proto/paymentrequest.proto";
 
 // Message sent from service to BIP 70 server
 message InvoiceParams {
-    // Incomplete payment details
-    PaymentDetails details = 1;
+    // Bitcoin network
+    string network = 1;
+    // Amount
+    uint64 amount = 2;
+    // Issue time
+    uint64 time = 4;
+    // Expiry time
+    uint64 expiry = 5;
+    // Merchant data
+    bytes merchant_data = 6;
     // Token to be signed and put in the payment ack headers
-    string token = 2;
+    bytes token = 7;
     // Data to be inserted into op_return
-    repeated bytes tx_data = 3;
+    bytes tx_data = 8;
     // Callback URL
-    string callback_url = 4;
+    string callback_url = 9;
 }
 
 // Message sent in response to the InvoiceParams

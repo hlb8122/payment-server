@@ -9,6 +9,7 @@ actix-web = "*"
 actix-http = "*"
 actix-service = "*"
 actix-rt = "*"
+actix-threadpool = "*"
 base64 = "*"
 bitcoin = "*"
 bitcoin-zmq = "*"
@@ -18,7 +19,7 @@ bytes = "*"
 clap = { version = "*", features = ["yaml"] }
 chrono = { version = "0.4.7", features = [ "serde" ] }
 config = "*"
-diesel = { version = "*", features = [ "postgres",  "r2d2", "chrono"] }
+diesel = { version = "*", features = [ "postgres",  "r2d2", "chrono", "uuid"] }
 dirs = "*"
 env_logger = "*"
 futures = "*"
@@ -29,6 +30,7 @@ prost = "*"
 reqwest = "*"
 secp256k1 = "0.12.0"
 serde = "*"
+uuid = { version = "*", features = ["serde", "v4"] }
 serde_json = "*"
 serde_derive = "*"
 url = "*"

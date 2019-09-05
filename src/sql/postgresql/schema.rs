@@ -47,14 +47,15 @@ table! {
     use diesel::sql_types::*;
     use super::PaymentStateType;
     payments (id) {
-        id -> Integer, // Payment ID
+        id -> Uuid, // Payment ID
         issue_time -> Timestamp, // The time of issuance
         amount -> Integer, // The amount to be paid
         address -> Text, // Address to be paid to
-        expiry_time -> Timestamp, // Expiry time of the payment
+        expiry_time -> Nullable<Timestamp>, // Expiry time of the payment
+        merchant_data -> Nullable<Blob>, // Merchant data
         state -> PaymentStateType, // Payment state
         payment_time -> Nullable<Timestamp>, // Time payment was completed
-        token -> Nullable<Text>, // Token to be signed then attached to payment ack response
+        token -> Nullable<Blob>, // Token to be signed then attached to payment ack response
         callback_url -> Nullable<Text>, // Callback URL
     }
 }
