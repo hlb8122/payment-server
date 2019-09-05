@@ -136,15 +136,15 @@ pub fn generate_invoice(
     let conn = data.1.to_owned();
 
     // Decode metadata
-    let body_raw = payload.map_err(|_| ServerError::InvoiceParamsDecode).fold(
+    let body_raw = payload.map_err(|_| ServerError::InvoiceRequestDecode).fold(
         BytesMut::new(),
         move |mut body, chunk| {
             body.extend_from_slice(&chunk);
             Ok::<_, ServerError>(body)
         },
     );
-    let fut_invoice_params = body_raw.and_then(|metadata_raw| {
-        InvoiceParams::decode(metadata_raw).map_err(|_| ServerError::InvoiceParamsDecode)
+    let fut_invoice_request = body_raw.and_then(|metadata_raw| {
+        InvoiceRequest::decode(metadata_raw).map_err(|_| ServerError::InvoiceRequestDecode)
     });
 
     // Get new addr and add to wallet
@@ -160,38 +160,38 @@ pub fn generate_invoice(
         Err(_e) => Err(ServerError::Payment(PaymentError::AddrFetchFailed)),
     });
 
-    let generate = fut_invoice_params.join(new_addr).and_then(
-        move |(invoice_params, (raw_addr, str_addr))| {
+    let generate = fut_invoice_request.join(new_addr).and_then(
+        move |(invoice_request, (raw_addr, str_addr))| {
             // Generate outputs
             let outputs =
-                generate_outputs(&raw_addr, invoice_params.amount, &invoice_params.tx_data);
+                generate_outputs(&raw_addr, invoice_request.amount, &invoice_request.tx_data);
 
             // Generate payment details
             let id = Uuid::new_v4();
-            let expires = match invoice_params.expires {
+            let expires = match invoice_request.expires {
                 0 => None,
                 some => Some(some),
             };
-            let callback_url = match invoice_params.callback_url.as_str() {
+            let callback_url = match invoice_request.callback_url.as_str() {
                 "" => None,
                 value => Some(value),
             };
-            let merchant_data = if invoice_params.merchant_data.is_empty() {
+            let merchant_data = if invoice_request.merchant_data.is_empty() {
                 None
             } else {
-                Some(invoice_params.merchant_data)
+                Some(invoice_request.merchant_data)
             };
-            let token = if invoice_params.token.is_empty() {
+            let token = if invoice_request.token.is_empty() {
                 None
             } else {
-                Some(&invoice_params.token[..])
+                Some(&invoice_request.token[..])
             };
             let payment_details = PaymentDetails {
                 network: Some(SETTINGS.network.to_string()),
-                payment_url: Some(format!("{}{}:", SETTINGS.payment_url, id.to_string())),
+                payment_url: Some(format!("{}{}:", SETTINGS.payment_url, &id.to_string())),
                 memo: None,
                 expires,
-                time: invoice_params.time,
+                time: invoice_request.time,
                 merchant_data,
                 outputs,
             };
@@ -202,7 +202,7 @@ pub fn generate_invoice(
                 &payment_details,
                 &id,
                 &str_addr,
-                invoice_params.amount as i64,
+                invoice_request.amount as i64,
                 callback_url,
                 token,
                 &connection,
@@ -216,11 +216,11 @@ pub fn generate_invoice(
                     actix_threadpool::BlockingError::Error(e) => e.into(),
                     _ => unreachable!(),
                 })
-                .map(|_| serialized_payment_details)
+                .map(move |_| (id.to_string(), serialized_payment_details))
         },
     );
 
-    let response = generate.and_then(|serialized_payment_details| {
+    let response = generate.and_then(|(payment_id, serialized_payment_details)| {
         // Generate payment invoice
         // TODO: Sign here
         let pki_type = Some("none".to_string());
@@ -232,7 +232,7 @@ pub fn generate_invoice(
             signature: None,
         };
         let invoice_response = InvoiceResponse {
-            payment_id: 0,
+            payment_id,
             payment_request: Some(payment_request),
         };
         let mut raw_invoice_response = Vec::with_capacity(invoice_response.encoded_len());

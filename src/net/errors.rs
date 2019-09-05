@@ -12,7 +12,7 @@ use crate::crypto::errors::CryptoError;
 pub enum ServerError {
     Crypto(CryptoError),
     NotFound,
-    InvoiceParamsDecode,
+    InvoiceRequestDecode,
     UnsupportedSigScheme,
     Payment(PaymentError),
     Address(AddressError),
@@ -24,7 +24,7 @@ impl fmt::Display for ServerError {
         let printable = match self {
             ServerError::Crypto(err) => return err.fmt(f),
             ServerError::NotFound => "not found",
-            ServerError::InvoiceParamsDecode => "invoice parameter decoding error",
+            ServerError::InvoiceRequestDecode => "invoice request decoding error",
             ServerError::UnsupportedSigScheme => "signature scheme not supported",
             ServerError::Payment(err) => return err.fmt(f),
             ServerError::Address(err) => return err.fmt(f),
@@ -48,7 +48,7 @@ impl From<CryptoError> for ServerError {
 
 impl From<DecodeError> for ServerError {
     fn from(_: DecodeError) -> Self {
-        ServerError::InvoiceParamsDecode
+        ServerError::InvoiceRequestDecode
     }
 }
 
@@ -74,7 +74,7 @@ impl error::ResponseError for ServerError {
         match self {
             // Do not yield sensitive information to clients
             ServerError::NotFound => HttpResponse::NotFound().body(self.to_string()),
-            ServerError::InvoiceParamsDecode => HttpResponse::BadRequest().body(self.to_string()),
+            ServerError::InvoiceRequestDecode => HttpResponse::BadRequest().body(self.to_string()),
             ServerError::UnsupportedSigScheme => HttpResponse::BadRequest().body(self.to_string()),
             ServerError::Crypto(err) => err.error_response(),
             ServerError::Payment(err) => err.error_response(),

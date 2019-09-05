@@ -3,7 +3,7 @@ package models;
 import "proto/paymentrequest.proto";
 
 // Message sent from service to BIP 70 server
-message InvoiceParams {
+message InvoiceRequest {
     // Bitcoin network
     string network = 1;
     // Amount
@@ -24,16 +24,16 @@ message InvoiceParams {
     string callback_url = 10;
 }
 
-// Message sent in response to the InvoiceParams
+// Message sent in response to the InvoiceRequest
 message InvoiceResponse {
-    // ID of the payment
-    uint64 payment_id = 1;
+    // UUID of the payment
+    string payment_id = 1;
     // Payment request to be sent to customer
     PaymentRequest payment_request = 2;
 }
 
 // Message sent to service on successful payment
 message CallbackPayload {
-    uint64 payment_id = 1;
+    string payment_id = 1;
     PaymentACK payment_ack = 2;
 }
