@@ -62,20 +62,39 @@ pub fn check_p2pkh(output: &TxOut, expected_amount: u64, expected_pk_hash: &[u8]
     }
 }
 
-pub fn check_outputs(tx: Transaction, expected_amount: u64, expected_pk_hash: &[u8]) -> bool {
-    // TODO: Enforce op_return outputs
-    tx.output
+pub fn check_op_return(output: &TxOut, expected_tx_data: &[u8]) -> bool {
+    let script = &output.script_pubkey[..];
+    if let Some(tx_data) = extract_op_return(script) {
+        tx_data == expected_tx_data
+    } else {
+        false
+    }
+}
+
+pub fn check_outputs(
+    tx: &Transaction,
+    expected_amount: u64,
+    expected_pk_hash: &[u8],
+    opt_tx_data: Option<Vec<u8>>,
+) -> bool {
+    if !tx
+        .output
         .iter()
         .any(|output| check_p2pkh(output, expected_amount, expected_pk_hash))
+    {
+        return false;
+    }
+
+    if let Some(tx_data) = opt_tx_data {
+        tx.output
+            .iter()
+            .any(|output| check_op_return(output, &tx_data[..]))
+    } else {
+        true
+    }
 }
 
 pub fn extract_op_return(script: &[u8]) -> Option<Vec<u8>> {
-    // OP_RETURN || LEN || keyserver || bitcoin pk hash || peer host
-    if script.len() <= 2 + 9 + 20 {
-        // Too short
-        return None;
-    }
-
     if script[0] != 106 {
         // Not op_return
         return None;

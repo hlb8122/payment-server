@@ -4,7 +4,7 @@ use diesel::*;
 use uuid::Uuid;
 
 #[derive(PartialEq, Debug, Serialize, Queryable, Deserialize)]
-pub struct Payment {
+pub struct PaymentRow {
     pub id: Uuid,
     pub issue_time: NaiveDateTime,
     pub amount: i64,
@@ -13,9 +13,12 @@ pub struct Payment {
     pub req_memo: Option<String>,
     pub merchant_data: Option<Vec<u8>>,
     pub ack_memo: Option<String>,
+    pub token_data: Option<Vec<u8>>,
+    pub tx_data: Option<Vec<u8>>,
     pub payment_state: PaymentStateEnum,
     pub payment_time: Option<NaiveDateTime>,
-    pub token: Option<Vec<u8>>,
+    pub tx_id: Option<String>,
+    pub refund_to: Option<String>,
     pub callback_url: Option<String>,
 }
 

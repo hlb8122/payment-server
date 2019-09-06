@@ -8,11 +8,10 @@ use actix_web::{
     web, HttpRequest, HttpResponse,
 };
 use bitcoin::{util::psbt::serialize::Deserialize, Transaction};
-use bitcoincash_addr::HashType;
 use bytes::BytesMut;
 
 use futures::{
-    future::{err, Either, Future},
+    future::{err, ok, Either, Future},
     stream::Stream,
 };
 use prost::Message;
@@ -21,7 +20,7 @@ use uuid::Uuid;
 
 use crate::{
     bitcoin::*,
-    crypto::{AddressCodec, CashAddrCodec},
+    crypto::{Address, CashAddrCodec, HashType},
     models::*,
     sql::postgresql::*,
     ConnPool, SETTINGS,
@@ -38,6 +37,9 @@ pub fn payment_handler(
     payload: web::Payload,
     data: web::Data<(BitcoinClient, ConnPool)>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = ServerError>> {
+    let bitcoin_client = data.0.to_owned();
+    let conn = data.1.to_owned();
+
     // Check headers
     let headers = req.headers();
     if headers.get(CONTENT_TYPE)
@@ -62,40 +64,66 @@ pub fn payment_handler(
     let payment = body_raw
         .and_then(|payment_raw| Payment::decode(payment_raw).map_err(|_| PaymentError::Decode));
 
-    let payment_ack = payment
+    // Check payment is valid
+    let check_payment = payment
+        .map_err(ServerError::Payment)
         .and_then(move |payment| {
             // Parse tx
-            let tx_raw = match payment.transactions.get(0) {
+            let res_tx = payment.transactions.get(0);
+            let tx_raw = match res_tx {
                 Some(some) => some,
-                None => return Either::A(err(PaymentError::NoTx)),
+                None => return Either::B(err(ServerError::Payment(PaymentError::NoTx))),
             }; // Assume first tx
             let tx = match Transaction::deserialize(tx_raw) {
                 Ok(ok) => ok,
-                Err(e) => return Either::A(err(PaymentError::from(e))),
+                Err(e) => return Either::B(err(ServerError::Payment(PaymentError::from(e)))),
             };
 
-            // Check outputs
-            // let wallet_data = &data.1;
-            // if !wallet_data.check_outputs(tx) {
-            //     return Either::A(err(PaymentError::InvalidOutputs));
-            // }
-
-            // Send tx
-            let bitcoin_client = &data.0;
-            Either::B(
-                bitcoin_client
-                    .send_tx(tx_raw)
-                    .and_then(|_txid| {
-                        // Create payment ack
-                        let memo = Some("Thanks for your custom!".to_string());
-                        Ok(PaymentAck { payment, memo })
+            // Get payment row
+            let connection = conn.get().unwrap();
+            let fut_payment_row = get_payment(payment_id.to_string(), &connection);
+            Either::A(
+                actix_web::web::block(|| fut_payment_row)
+                    .map_err(|err| match err {
+                        actix_threadpool::BlockingError::Error(e) => e.into(),
+                        _ => unreachable!(),
                     })
-                    .map_err(|_| PaymentError::InvalidTx),
+                    .and_then(move |payment_row| {
+                        // Verify payment
+                        let expected_pk_hash =
+                            Address::decode(&payment_row.address).unwrap().into_body();
+                        if !check_outputs(
+                            &tx,
+                            payment_row.amount as u64,
+                            &expected_pk_hash,
+                            payment_row.tx_data,
+                        ) {
+                            return Err(ServerError::Payment(PaymentError::InvalidTx));
+                        }
+                        Ok(payment)
+                    }),
             )
-        })
-        .map_err(ServerError::Payment);
+        });
 
-    let response = payment_ack.and_then(|ack| {
+    // Send payment to bitcoind
+    let send_payment = check_payment.and_then(move |payment| {
+        // Parse tx
+        let tx_raw = payment.transactions.get(0).unwrap(); // This is safe from before
+
+        // Send tx
+        bitcoin_client
+            .send_tx(tx_raw)
+            .and_then(|tx_id| {
+                // Create payment ack
+                let memo = Some("Thanks for your custom!".to_string());
+                Ok((tx_id, PaymentAck { payment, memo }))
+            })
+            .map_err(|_| PaymentError::InvalidTx.into())
+    });
+
+    // TODO: Update row
+
+    let response = send_payment.and_then(|(tx_id, ack)| {
         // Encode payment ack
         let mut raw_ack = Vec::with_capacity(ack.encoded_len());
         ack.encode(&mut raw_ack).unwrap();
@@ -132,7 +160,7 @@ pub fn generate_invoice(
     payload: web::Payload,
     data: web::Data<(BitcoinClient, ConnPool)>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = ServerError>> {
-    let mut client = data.0.to_owned();
+    let mut bitcoin_client = data.0.to_owned();
     let conn = data.1.to_owned();
 
     // Decode metadata
@@ -148,17 +176,19 @@ pub fn generate_invoice(
     });
 
     // Get new addr and add to wallet
-    let new_addr = client.get_new_addr().then(move |addr_opt| match addr_opt {
-        Ok(str_addr) => {
-            let addr = CashAddrCodec::decode(&str_addr).map_err(ServerError::Address)?;
-            let network: Network = addr.network.clone().into();
-            if network != SETTINGS.network || addr.hash_type != HashType::Key {
-                return Err(ServerError::Payment(PaymentError::MismatchedNetwork))?; // TODO: Finer grained error here
+    let new_addr = bitcoin_client
+        .get_new_addr()
+        .then(move |addr_opt| match addr_opt {
+            Ok(str_addr) => {
+                let addr = Address::decode(&str_addr).map_err(ServerError::Address)?;
+                let network: Network = addr.network.clone().into();
+                if network != SETTINGS.network || addr.hash_type != HashType::Key {
+                    return Err(ServerError::Payment(PaymentError::MismatchedNetwork))?; // TODO: Finer grained error here
+                }
+                Ok((addr.into_body(), str_addr))
             }
-            Ok((addr.into_body(), str_addr))
-        }
-        Err(_e) => Err(ServerError::Payment(PaymentError::AddrFetchFailed)),
-    });
+            Err(_e) => Err(ServerError::Payment(PaymentError::AddrFetchFailed)),
+        });
 
     let generate = fut_invoice_request.join(new_addr).and_then(
         move |(invoice_request, (raw_addr, str_addr))| {

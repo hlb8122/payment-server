@@ -10,7 +10,10 @@ use diesel::{
 };
 use uuid::Uuid;
 
-use crate::{models::*, sql::postgresql::models::NewPayment};
+use crate::{
+    models::*,
+    sql::postgresql::models::{NewPayment, PaymentRow},
+};
 
 pub fn add_payment(
     payment_details: &PaymentDetails,
@@ -57,4 +60,16 @@ pub fn add_payment(
         .values(&new_payment)
         .returning(dsl_id)
         .get_result(conn)
+}
+
+pub fn get_payment(
+    payment_id: String,
+    conn: &PooledConnection<ConnectionManager<PgConnection>>,
+) -> Result<PaymentRow, Error> {
+    use schema::payments::dsl::{id as dsl_id, payments};
+    let uuid_payment_id = Uuid::parse_str(&payment_id).unwrap();
+
+    payments
+        .filter(dsl_id.eq(uuid_payment_id))
+        .first::<models::PaymentRow>(conn)
 }
