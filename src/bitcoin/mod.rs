@@ -75,7 +75,7 @@ pub fn check_outputs(
     tx: &Transaction,
     expected_amount: u64,
     expected_pk_hash: &[u8],
-    opt_tx_data: Option<Vec<u8>>,
+    opt_tx_data: Option<&Vec<u8>>,
 ) -> bool {
     if !tx
         .output

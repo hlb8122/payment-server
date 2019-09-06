@@ -96,34 +96,38 @@ pub fn payment_handler(
                             &tx,
                             payment_row.amount as u64,
                             &expected_pk_hash,
-                            payment_row.tx_data,
+                            payment_row.tx_data.as_ref(),
                         ) {
                             return Err(ServerError::Payment(PaymentError::InvalidTx));
                         }
-                        Ok(payment)
+                        Ok((payment, payment_row))
                     }),
             )
         });
 
     // Send payment to bitcoind
-    let send_payment = check_payment.and_then(move |payment| {
+    let send_payment = check_payment.and_then(move |(payment, payment_row)| {
         // Parse tx
         let tx_raw = payment.transactions.get(0).unwrap(); // This is safe from before
 
         // Send tx
         bitcoin_client
             .send_tx(tx_raw)
-            .and_then(|tx_id| {
-                // Create payment ack
-                let memo = Some("Thanks for your custom!".to_string());
-                Ok((tx_id, PaymentAck { payment, memo }))
-            })
+            .and_then(|tx_id| Ok((tx_id, payment, payment_row)))
             .map_err(|_| PaymentError::InvalidTx.into())
     });
 
-    // TODO: Update row
+    // Update row
+    let update_row = send_payment.and_then(|(tx_id, payment, payment_row)| {
+        
+        Ok((tx_id, payment, payment_row))
+    });
 
-    let response = send_payment.and_then(|(tx_id, ack)| {
+    let response = update_row.and_then(|(tx_id, payment, payment_row)| {
+        // Create PaymentAck
+        let memo = payment_row.ack_memo;
+        let ack = PaymentAck { payment, memo };
+
         // Encode payment ack
         let mut raw_ack = Vec::with_capacity(ack.encoded_len());
         ack.encode(&mut raw_ack).unwrap();
