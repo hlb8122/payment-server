@@ -58,7 +58,7 @@ table! {
         req_memo -> Nullable<Text>, // Memo to be included in the request
         merchant_data -> Nullable<Blob>, // Merchant data
         ack_memo -> Nullable<Text>, // Memo to be included in the request
-        token_data -> Nullable<Blob>, // Token to be signed then attached to payment ack response
+        tokenize -> Bool, // Assume merchant data is URL and append token
         tx_data -> Nullable<Blob>, // Data required inside OP_RETURN
         payment_state -> PaymentStateType, // Payment state
         payment_time -> Nullable<Timestamp>, // Time payment was completed

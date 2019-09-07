@@ -1,7 +1,7 @@
 pub mod models;
 pub mod schema;
 
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, Utc};
 use diesel::{
     pg::PgConnection,
     prelude::*,
@@ -12,8 +12,13 @@ use uuid::Uuid;
 
 use crate::{
     models::*,
-    sql::postgresql::models::{NewPayment, PaymentRow},
+    sql::postgresql::{
+        models::{NewPayment, PaymentRow},
+        schema::PaymentStateEnum,
+    },
 };
+
+use schema::payments::dsl::{self, payments};
 
 pub fn add_payment(
     payment_details: &PaymentDetails,
@@ -23,14 +28,11 @@ pub fn add_payment(
     req_memo: Option<&str>,
     ack_memo: Option<&str>,
     callback_url: Option<&str>,
-    token_data: Option<&[u8]>,
+    tokenize: bool,
     tx_data: Option<&[u8]>,
     conn: &PooledConnection<ConnectionManager<PgConnection>>,
 ) -> Result<Uuid, Error> {
-    use schema::{
-        payments::dsl::{id as dsl_id, payments},
-        PaymentStateEnum,
-    };
+    use schema::{payments::dsl::id as dsl_id};
 
     let issue_time = &NaiveDateTime::from_timestamp(payment_details.time as i64, 0);
     let expiry_time = payment_details
@@ -51,7 +53,7 @@ pub fn add_payment(
         req_memo,
         merchant_data,
         ack_memo,
-        token_data,
+        tokenize,
         tx_data,
         payment_state: &PaymentStateEnum::Pending,
         callback_url,
@@ -63,13 +65,43 @@ pub fn add_payment(
 }
 
 pub fn get_payment(
-    payment_id: String,
+    payment_id: &str,
     conn: &PooledConnection<ConnectionManager<PgConnection>>,
 ) -> Result<PaymentRow, Error> {
-    use schema::payments::dsl::{id as dsl_id, payments};
-    let uuid_payment_id = Uuid::parse_str(&payment_id).unwrap();
+    use schema::payments::dsl::id as dsl_id;
 
+    let uuid_payment_id = Uuid::parse_str(&payment_id).unwrap();
     payments
         .filter(dsl_id.eq(uuid_payment_id))
         .first::<models::PaymentRow>(conn)
+}
+
+pub fn reject_payment(
+    payment_id: &str,
+    conn: &PooledConnection<ConnectionManager<PgConnection>>,
+) -> Result<(), Error> {
+    let uuid_payment_id = Uuid::parse_str(&payment_id).unwrap();
+    diesel::update(payments.find(uuid_payment_id))
+        .set(dsl::payment_state.eq(PaymentStateEnum::Rejected))
+        .execute(conn)?;
+    Ok(())
+}
+
+pub fn accept_payment(
+    payment_id: &str,
+    tx_id: &str,
+    reund_to: Option<&str>,
+    conn: &PooledConnection<ConnectionManager<PgConnection>>,
+) -> Result<(), Error> {
+    let uuid_payment_id = Uuid::parse_str(&payment_id).unwrap();
+    let gen_accept_time = Utc::now().naive_utc();
+    diesel::update(payments.find(uuid_payment_id))
+        .set((
+            dsl::payment_state.eq(PaymentStateEnum::Received),
+            dsl::payment_time.eq(gen_accept_time),
+            dsl::refund_to.eq(reund_to),
+            dsl::tx_id.eq(tx_id),
+        ))
+        .execute(conn)?;
+    Ok(())
 }

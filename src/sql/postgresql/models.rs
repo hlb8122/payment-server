@@ -13,7 +13,7 @@ pub struct PaymentRow {
     pub req_memo: Option<String>,
     pub merchant_data: Option<Vec<u8>>,
     pub ack_memo: Option<String>,
-    pub token_data: Option<Vec<u8>>,
+    pub tokenize: bool,
     pub tx_data: Option<Vec<u8>>,
     pub payment_state: PaymentStateEnum,
     pub payment_time: Option<NaiveDateTime>,
@@ -35,6 +35,6 @@ pub struct NewPayment<'a> {
     pub tx_data: Option<&'a [u8]>,
     pub ack_memo: Option<&'a str>,
     pub payment_state: &'a PaymentStateEnum,
-    pub token_data: Option<&'a [u8]>,
+    pub tokenize: bool,
     pub callback_url: Option<&'a str>,
 }
