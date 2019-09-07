@@ -6,6 +6,7 @@ CREATE TABLE public.payments
     id uuid NOT NULL,
     issue_time timestamp without time zone NOT NULL,
     amount bigint NOT NULL,
+    address text NOT NULL,
     expiry_time timestamp without time zone,
     req_memo text COLLATE pg_catalog."default",
     merchant_data bytea,
