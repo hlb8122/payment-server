@@ -256,7 +256,7 @@ pub fn generate_invoice(
             };
             let payment_details = PaymentDetails {
                 network: Some(SETTINGS.network.to_string()),
-                payment_url: Some(format!("{}{}:", SETTINGS.payment_url, &id.to_string())),
+                payment_url: Some(format!("{}{}", SETTINGS.payment_url, &id.to_string())),
                 memo: req_memo.map(|value| value.to_string()),
                 expires,
                 time: invoice_request.time,
@@ -281,10 +281,10 @@ pub fn generate_invoice(
                 &str_addr,
                 invoice_request.amount as i64,
                 req_memo,
-                callback_url,
                 ack_memo,
                 invoice_request.tokenize,
                 tx_data,
+                callback_url,
                 &connection,
             );
             let mut serialized_payment_details = Vec::with_capacity(payment_details.encoded_len());

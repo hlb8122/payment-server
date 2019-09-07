@@ -27,9 +27,9 @@ pub fn add_payment(
     amount: i64,
     req_memo: Option<&str>,
     ack_memo: Option<&str>,
-    callback_url: Option<&str>,
     tokenize: bool,
     tx_data: Option<&[u8]>,
+    callback_url: Option<&str>,
     conn: &PooledConnection<ConnectionManager<PgConnection>>,
 ) -> Result<Uuid, Error> {
     use schema::{payments::dsl::id as dsl_id};

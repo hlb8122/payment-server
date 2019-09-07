@@ -16,6 +16,7 @@ CREATE TABLE public.payments
     payment_state payment_state_enum,
     payment_time timestamp without time zone,
     tx_id text COLLATE pg_catalog."default",
+    refund_to text COLLATE pg_catalog."default",
     callback_url text COLLATE pg_catalog."default",
     CONSTRAINT payments_pkey PRIMARY KEY (id)
 )
