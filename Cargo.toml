@@ -1,5 +1,5 @@
 [package]
-name = "bip70-server"
+name = "payment-server"
 version = "0.1.0"
 authors = ["Harry L. Barber <hlbarber93@gmail.com>"]
 edition = "2018"

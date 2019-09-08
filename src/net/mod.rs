@@ -195,7 +195,6 @@ pub fn payment_handler(
 }
 
 pub fn generate_invoice(
-    req: HttpRequest,
     payload: web::Payload,
     data: web::Data<(BitcoinClient, ConnPool)>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = ServerError>> {
