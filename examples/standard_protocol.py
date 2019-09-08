@@ -26,7 +26,7 @@ raw_invoice_params = invoice_params.SerializeToString()
 # Get payment request
 print("Sending invoice request...")
 response = requests.post(
-    "http://127.0.0.1:8081/invoice", data=raw_invoice_params)
+    "http://127.0.0.1:8900/invoice", data=raw_invoice_params)
 invoice_response = InvoiceResponse.FromString(response.content)
 payment_request = invoice_response.payment_request
 print("Received PaymentRequest:")

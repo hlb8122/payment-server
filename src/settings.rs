@@ -40,9 +40,9 @@ impl Settings {
             Some(some) => some,
             None => return Err(ConfigError::Message("no home directory".to_string())),
         };
-        s.set_default("bind_public", "127.0.0.1:8080").unwrap();
-        s.set_default("bind_private", "127.0.0.1:8081").unwrap();
-        s.set_default("payment_url", "http://127.0.0.1:8080/payment/")
+        s.set_default("bind_public", "127.0.0.1:8081").unwrap();
+        s.set_default("bind_private", "127.0.0.1:8900").unwrap();
+        s.set_default("payment_url", "http://127.0.0.1:8081/payment/")
             .unwrap();
         s.set_default("node_ip", "127.0.0.1").unwrap();
         s.set_default("rpc_port", "18443").unwrap();
