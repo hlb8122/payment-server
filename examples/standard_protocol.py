@@ -19,12 +19,14 @@ rpc_connection = AuthServiceProxy(
     "http://%s:%s@127.0.0.1:18443" % (rpc_user, rpc_password))
 
 time = int(time())
-invoice_params = InvoiceRequest(network="mainnet", amount=5, time=time, expires=time + 10, tokenize=False, ack_memo="Thanks for your custom!")
+invoice_params = InvoiceRequest(network="regnet", amount=5, time=time,
+                                expires=time + 10, tokenize=False, ack_memo="Thanks for your custom!")
 raw_invoice_params = invoice_params.SerializeToString()
 
 # Get payment request
 print("Sending invoice request...")
-response = requests.post("http://127.0.0.1:8081/invoice", data=raw_invoice_params)
+response = requests.post(
+    "http://127.0.0.1:8081/invoice", data=raw_invoice_params)
 invoice_response = InvoiceResponse.FromString(response.content)
 payment_request = invoice_response.payment_request
 print("Received PaymentRequest:")
