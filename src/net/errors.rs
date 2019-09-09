@@ -101,6 +101,7 @@ pub enum PaymentError {
     InvalidTx,
     MismatchedNetwork,
     AddrFetchFailed,
+    NotPending,
 }
 
 impl From<PaymentError> for ServerError {
@@ -133,6 +134,7 @@ impl fmt::Display for PaymentError {
             PaymentError::InvalidTx => "invalid tx",
             PaymentError::AddrFetchFailed => "failed to fetch address",
             PaymentError::MismatchedNetwork => "address mismatched with node network",
+            PaymentError::NotPending => "payment is not pending",
         };
         write!(f, "{}", printable)
     }
@@ -156,6 +158,7 @@ impl error::ResponseError for PaymentError {
             PaymentError::InvalidTx => HttpResponse::BadRequest(),
             PaymentError::MismatchedNetwork => HttpResponse::BadRequest(),
             PaymentError::AddrFetchFailed => HttpResponse::InternalServerError(),
+            PaymentError::NotPending => HttpResponse::NotFound(),
         }
         .body(self.to_string())
     }

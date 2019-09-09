@@ -60,7 +60,7 @@ impl Settings {
 
         // Load config from file
         let mut default_config = home_dir.clone();
-        default_config.push(".bip70-server/config");
+        default_config.push(".payment-server/config");
         let default_config_str = default_config.to_str().unwrap();
         let config_path = matches.value_of("config").unwrap_or(default_config_str);
         s.merge(File::with_name(config_path).required(false))?;
@@ -108,6 +108,11 @@ impl Settings {
         // Set secret from cmd line
         if let Some(secret) = matches.value_of("secret") {
             s.set("secret", secret)?;
+        }
+
+        // Set secret from cmd line
+        if let Some(secret) = matches.value_of("secret") {
+            s.set("db_host", secret)?;
         }
 
         // TODO: Database from commandline

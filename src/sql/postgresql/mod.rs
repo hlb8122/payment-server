@@ -32,7 +32,7 @@ pub fn add_payment(
     callback_url: Option<&str>,
     conn: &PooledConnection<ConnectionManager<PgConnection>>,
 ) -> Result<Uuid, Error> {
-    use schema::{payments::dsl::id as dsl_id};
+    use schema::payments::dsl::id as dsl_id;
 
     let issue_time = &NaiveDateTime::from_timestamp(payment_details.time as i64, 0);
     let expiry_time = payment_details

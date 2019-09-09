@@ -97,6 +97,13 @@ pub fn payment_handler(
                     // Verify payment
                     let expected_pk_hash =
                         Address::decode(&payment_row.address).unwrap().into_body();
+
+                    // Check payment state
+                    if payment_row.payment_state != PaymentStateEnum::Pending {
+                        return Either::B(err(PaymentError::NotPending));
+                    }
+
+                    // Check outputs
                     if !check_outputs(
                         &tx,
                         payment_row.amount as u64,
